@@ -28,7 +28,7 @@ public class AnvilListener implements Listener {
         enchantmentLevelLimits.forEach((key, level) -> {
             Enchantment enchantment = Enchantment.getByKey(NamespacedKey.minecraft(key));
 
-            if( enchantment != null || !(level instanceof Integer levelInt)){
+            if( enchantment == null || !(level instanceof Integer levelInt)){
                 logger.warning("Couldn't load key '"+ key +"'");
                 return;
             }
