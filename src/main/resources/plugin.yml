@@ -1,6 +1,6 @@
 main: de.rcv4.overenchant.OverEnchant
 name: OverEnchant
-version: 1.0.0
+version: 1.0.1
 description: This plugin allows enchanting levels above the default limits.
 load: POSTWORLD
 author: rcv4
