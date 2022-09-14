@@ -1,5 +1,6 @@
 package de.rcv4.overenchant.listener;
 
+import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -7,12 +8,41 @@ import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.logging.Logger;
 
 
 public class AnvilListener implements Listener {
+
+    private final Map<Enchantment, Integer> maxLevels;
+    private final Logger logger;
+
+    public AnvilListener(Logger logger, Map<String, Object> enchantmentLevelLimits){
+        this.logger = logger;
+        this.maxLevels = parseMaxLevels(enchantmentLevelLimits);
+    }
+
+    private Map<Enchantment, Integer> parseMaxLevels(Map<String, Object> enchantmentLevelLimits){
+        Map<Enchantment, Integer> result = new HashMap<>();
+        enchantmentLevelLimits.forEach((key, level) -> {
+            Enchantment enchantment = Enchantment.getByKey(NamespacedKey.minecraft(key));
+
+            if( enchantment != null || !(level instanceof Integer levelInt)){
+                logger.warning("Couldn't load key '"+ key +"'");
+                return;
+            }
+
+            if (levelInt == -1 || enchantment.getMaxLevel() > levelInt) {
+                return;
+            }
+
+            logger.info(enchantment.getKey().toString() + " - set maximum level to " + level);
+            result.put(enchantment, levelInt);
+
+        });
+        return result;
+    }
 
     @EventHandler
     public void anvilListener(PrepareAnvilEvent e){
@@ -25,14 +55,26 @@ public class AnvilListener implements Listener {
 
         Map<Enchantment, Integer> enchantments1 = getEnchantments(itemStack1);
         Map<Enchantment, Integer> enchantments2 = getEnchantments(itemStack2);
-        Map<Enchantment, Integer> merged = Stream.of(enchantments1, enchantments2).flatMap(m -> m.entrySet().stream())
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, this::getUplevel));
+        Map<Enchantment, Integer> merged = getMergedEnchantments(enchantments1, enchantments2);
 
         for(var ench : getEnchantments(is).entrySet()){
             if(merged.containsKey(ench.getKey())){
                 setEnchantment(is, ench.getKey(), merged.get(ench.getKey()));
             }
         }
+    }
+
+    private Map<Enchantment, Integer>getMergedEnchantments(Map<Enchantment, Integer>... itemEnchantments){
+        Map<Enchantment, Integer> result = new HashMap<>();
+        for (Map<Enchantment, Integer> enchantmentMap : itemEnchantments) {
+            enchantmentMap.forEach(((enchantment, level) -> {
+
+                int current = result.getOrDefault(enchantment, 0);
+                result.put(enchantment, getUplevel(enchantment, level, current));
+
+            }));
+        }
+        return result;
     }
 
     private void setEnchantment(ItemStack itemStack, Enchantment enchantment, int value){
@@ -53,10 +95,13 @@ public class AnvilListener implements Listener {
         return itemStack.getEnchantments();
     }
 
-    private int getUplevel(int a, int b) {
-        if(a == b) {
-            return a + 1;
+    private int getUplevel(Enchantment enchantment, int level1, int level2) {
+        int newLevel;
+        if(level1 == level2) {
+            newLevel = level1 + 1;
+        } else {
+            newLevel = Math.max( level1, level2 );
         }
-        return Math.max(a, b);
+        return maxLevels.getOrDefault( enchantment, Integer.MAX_VALUE ) < newLevel ? level1 : newLevel;
     }
 }
